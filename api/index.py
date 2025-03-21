@@ -7,29 +7,60 @@ class handler(BaseHTTPRequestHandler):
         <html>
         <head>
             <title>Stock Market Analysis</title>
-            <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+            <style>
+                body {
+                    font-family: Arial, sans-serif;
+                    line-height: 1.6;
+                    margin: 0;
+                    padding: 20px;
+                    background-color: #f8f9fa;
+                }
+                .container {
+                    max-width: 800px;
+                    margin: 0 auto;
+                    padding: 20px;
+                }
+                .card {
+                    background: white;
+                    border-radius: 8px;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                    padding: 20px;
+                    margin-top: 20px;
+                }
+                h1 {
+                    color: #333;
+                    text-align: center;
+                    margin-bottom: 30px;
+                }
+                .form-group {
+                    margin-bottom: 20px;
+                }
+                .upload-btn {
+                    background-color: #007bff;
+                    color: white;
+                    padding: 10px 20px;
+                    border: none;
+                    border-radius: 4px;
+                    cursor: pointer;
+                }
+                .upload-btn:hover {
+                    background-color: #0056b3;
+                }
+            </style>
         </head>
         <body>
-            <div class="container py-5">
-                <h1 class="text-center mb-4">Stock Market Analysis</h1>
+            <div class="container">
+                <h1>Stock Market Analysis</h1>
                 
-                <div class="row">
-                    <div class="col-md-8 offset-md-2">
-                        <div class="card">
-                            <div class="card-body">
-                                <h5 class="card-title">Data Upload</h5>
-                                <div class="mb-3">
-                                    <label for="fileUpload" class="form-label">Upload your stock data</label>
-                                    <input class="form-control" type="file" id="fileUpload">
-                                </div>
-                                <button class="btn btn-primary" onclick="alert('Coming soon!')">Upload</button>
-                            </div>
-                        </div>
+                <div class="card">
+                    <h2>Data Upload</h2>
+                    <div class="form-group">
+                        <label>Upload your stock data:</label><br>
+                        <input type="file" id="fileUpload" style="margin: 10px 0;">
                     </div>
+                    <button class="upload-btn" onclick="alert('Coming soon!')">Upload</button>
                 </div>
             </div>
-            
-            <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
         </body>
         </html>
         """
