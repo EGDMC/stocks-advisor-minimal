@@ -1,2 +1,1 @@
-# Using standard library and math functions
-numpy==1.24.1  # For technical analysis calculations
+numpy==1.21.6  # Last version supporting Python 3.9
