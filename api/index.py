@@ -4,30 +4,37 @@ import cgi
 import csv
 import io
 from statistics import mean, stdev
-import numpy as np
+
+def moving_average(data, window):
+    """Calculate moving average using pure Python"""
+    result = []
+    for i in range(len(data) - window + 1):
+        window_average = sum(data[i:i+window]) / window
+        result.append(round(window_average, 2))
+    return result
 
 def find_support_resistance(prices, n_points=5):
-    """Find support and resistance levels using local min/max"""
+    """Find support and resistance levels using pure Python"""
     supports = []
     resistances = []
     
-    prices = np.array(prices)
     for i in range(n_points, len(prices) - n_points):
-        left_array = prices[i-n_points:i]
-        right_array = prices[i+1:i+n_points+1]
+        current_price = prices[i]
+        left_prices = prices[i-n_points:i]
+        right_prices = prices[i+1:i+n_points+1]
         
-        if np.all(prices[i] <= left_array) and np.all(prices[i] <= right_array):
-            supports.append((i, prices[i]))
-        elif np.all(prices[i] >= left_array) and np.all(prices[i] >= right_array):
-            resistances.append((i, prices[i]))
+        if all(current_price <= p for p in left_prices) and all(current_price <= p for p in right_prices):
+            supports.append(current_price)
+        elif all(current_price >= p for p in left_prices) and all(current_price >= p for p in right_prices):
+            resistances.append(current_price)
     
     # Get most recent levels
-    supports = sorted(supports, key=lambda x: x[1])[:3]
-    resistances = sorted(resistances, key=lambda x: x[1], reverse=True)[:3]
+    supports = sorted(supports)[:3]
+    resistances = sorted(resistances, reverse=True)[:3]
     
     return {
-        'support_levels': [round(price, 2) for _, price in supports],
-        'resistance_levels': [round(price, 2) for _, price in resistances]
+        'support_levels': [round(price, 2) for price in supports],
+        'resistance_levels': [round(price, 2) for price in resistances]
     }
 
 def analyze_stock_data(headers, data):
@@ -50,21 +57,17 @@ def analyze_stock_data(headers, data):
         'resistance_levels': []
     }
     
+    # Calculate moving averages
+    ma20 = moving_average(close_prices, 20) if len(close_prices) >= 20 else []
+    ma50 = moving_average(close_prices, 50) if len(close_prices) >= 50 else []
+    
     # Prepare chart data
     chart_data = {
         'labels': dates,
         'prices': [round(price, 2) for price in close_prices],
-        'volumes': numeric_data.get('volume', []),
+        'ma20': ma20,
+        'ma50': ma50
     }
-    
-    # Calculate technical levels
-    if close_prices:
-        price_array = np.array(close_prices)
-        ma20 = np.convolve(price_array, np.ones(20)/20, mode='valid')
-        ma50 = np.convolve(price_array, np.ones(50)/50, mode='valid')
-        
-        chart_data['ma20'] = [round(x, 2) for x in ma20]
-        chart_data['ma50'] = [round(x, 2) for x in ma50]
     
     analysis = {
         'basic_info': {
@@ -72,10 +75,7 @@ def analyze_stock_data(headers, data):
             'date_range': f"From {dates[-1]} to {dates[0]}"
         },
         'chart_data': chart_data,
-        'technical_levels': {
-            'support_levels': levels['support_levels'],
-            'resistance_levels': levels['resistance_levels']
-        }
+        'technical_levels': levels
     }
     
     if close_prices:
@@ -88,15 +88,16 @@ def analyze_stock_data(headers, data):
             'average_price': round(mean(close_prices), 2),
             'highest_price': round(max(close_prices), 2),
             'lowest_price': round(min(close_prices), 2),
-            'volatility': round(stdev(close_prices), 2),
+            'volatility': round(stdev(close_prices), 2) if len(close_prices) > 1 else 0,
             'total_change': round(price_change, 2),
             'total_change_percentage': round(price_change_pct, 2)
         }
     
     if 'volume' in numeric_data:
         volumes = numeric_data['volume']
+        avg_volume = mean(volumes)
         analysis['volume_analysis'] = {
-            'average_volume': int(mean(volumes)),
+            'average_volume': int(avg_volume),
             'latest_volume': int(volumes[0])
         }
     

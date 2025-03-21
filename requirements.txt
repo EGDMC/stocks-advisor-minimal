@@ -1,1 +1,1 @@
-numpy==1.21.6  # Last version supporting Python 3.9
+# Using only Python standard library modules
