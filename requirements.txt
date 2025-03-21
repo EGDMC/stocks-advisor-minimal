@@ -1,1 +1,2 @@
-# Using only Python standard library modules
+# Using standard library and math functions
+numpy==1.24.1  # For technical analysis calculations
