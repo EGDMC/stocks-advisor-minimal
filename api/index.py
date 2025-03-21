@@ -2,6 +2,32 @@ from http.server import BaseHTTPRequestHandler
 import json
 import cgi
 import io
+import pandas as pd
+import numpy as np
+
+def analyze_stock_data(csv_content):
+    # Read CSV from string
+    df = pd.read_csv(io.StringIO(csv_content))
+    
+    # Basic analysis
+    analysis = {
+        'statistics': {
+            'total_rows': len(df),
+            'columns': list(df.columns)
+        },
+        'summary': {}
+    }
+    
+    # Calculate basic statistics for numeric columns
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        analysis['summary'][col] = {
+            'mean': float(df[col].mean()),
+            'min': float(df[col].min()),
+            'max': float(df[col].max())
+        }
+    
+    return analysis
 
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -30,10 +56,12 @@ class handler(BaseHTTPRequestHandler):
                     padding: 20px;
                     margin-top: 20px;
                 }
-                h1 {
+                h1, h2 {
                     color: #333;
+                    margin-bottom: 20px;
+                }
+                h1 {
                     text-align: center;
-                    margin-bottom: 30px;
                 }
                 .form-group {
                     margin-bottom: 20px;
@@ -49,6 +77,13 @@ class handler(BaseHTTPRequestHandler):
                 .upload-btn:hover {
                     background-color: #0056b3;
                 }
+                #result {
+                    margin-top: 20px;
+                    padding: 15px;
+                    border-radius: 4px;
+                    background-color: #e9ecef;
+                    white-space: pre-wrap;
+                }
             </style>
         </head>
         <body>
@@ -59,13 +94,39 @@ class handler(BaseHTTPRequestHandler):
                     <h2>Data Upload</h2>
                     <form action="/api" method="post" enctype="multipart/form-data">
                         <div class="form-group">
-                            <label>Upload your stock data:</label><br>
+                            <label>Upload your stock data (CSV):</label><br>
                             <input type="file" name="file" accept=".csv" style="margin: 10px 0;" required>
                         </div>
                         <button type="submit" class="upload-btn">Upload and Analyze</button>
                     </form>
                 </div>
+                
+                <div id="result" style="display: none;">
+                    <!-- Results will be displayed here -->
+                </div>
             </div>
+            
+            <script>
+                document.querySelector('form').onsubmit = async (e) => {
+                    e.preventDefault();
+                    const formData = new FormData(e.target);
+                    
+                    try {
+                        const response = await fetch('/api', {
+                            method: 'POST',
+                            body: formData
+                        });
+                        const result = await response.json();
+                        
+                        const resultDiv = document.getElementById('result');
+                        resultDiv.style.display = 'block';
+                        resultDiv.innerHTML = '<h2>Analysis Results</h2>' + 
+                                           '<pre>' + JSON.stringify(result, null, 2) + '</pre>';
+                    } catch (error) {
+                        console.error('Error:', error);
+                    }
+                };
+            </script>
         </body>
         </html>
         """
@@ -76,45 +137,49 @@ class handler(BaseHTTPRequestHandler):
         self.wfile.write(html_content.encode('utf-8'))
 
     def do_POST(self):
-        # Parse the form data
         content_type = self.headers.get('Content-Type', '')
-        if 'multipart/form-data' in content_type:
-            form = cgi.FieldStorage(
-                fp=self.rfile,
-                headers=self.headers,
-                environ={'REQUEST_METHOD': 'POST'}
-            )
-            
-            # Get the uploaded file
-            if 'file' in form:
-                fileitem = form['file']
-                if fileitem.filename:
-                    # Read the file content
-                    file_content = fileitem.file.read().decode('utf-8')
-                    
-                    # Here you would process the file content
-                    response = {
-                        'status': 'success',
-                        'message': f'File {fileitem.filename} received',
-                        'size': len(file_content)
-                    }
+        try:
+            if 'multipart/form-data' in content_type:
+                form = cgi.FieldStorage(
+                    fp=self.rfile,
+                    headers=self.headers,
+                    environ={'REQUEST_METHOD': 'POST'}
+                )
+                
+                if 'file' in form:
+                    fileitem = form['file']
+                    if fileitem.filename:
+                        file_content = fileitem.file.read().decode('utf-8')
+                        
+                        # Analyze the data
+                        analysis_result = analyze_stock_data(file_content)
+                        
+                        response = {
+                            'status': 'success',
+                            'filename': fileitem.filename,
+                            'analysis': analysis_result
+                        }
+                    else:
+                        response = {
+                            'status': 'error',
+                            'message': 'No file was uploaded'
+                        }
                 else:
                     response = {
                         'status': 'error',
-                        'message': 'No file was uploaded'
+                        'message': 'No file field in form'
                     }
             else:
                 response = {
                     'status': 'error',
-                    'message': 'No file field in form'
+                    'message': 'Invalid content type'
                 }
-        else:
+        except Exception as e:
             response = {
                 'status': 'error',
-                'message': 'Invalid content type'
+                'message': f'Error processing file: {str(e)}'
             }
 
-        # Send response
         self.send_response(200)
         self.send_header('Content-type', 'application/json')
         self.end_headers()
