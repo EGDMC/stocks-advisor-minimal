@@ -1,33 +1,8 @@
 from http.server import BaseHTTPRequestHandler
 import json
 import cgi
+import csv
 import io
-import pandas as pd
-import numpy as np
-
-def analyze_stock_data(csv_content):
-    # Read CSV from string
-    df = pd.read_csv(io.StringIO(csv_content))
-    
-    # Basic analysis
-    analysis = {
-        'statistics': {
-            'total_rows': len(df),
-            'columns': list(df.columns)
-        },
-        'summary': {}
-    }
-    
-    # Calculate basic statistics for numeric columns
-    numeric_cols = df.select_dtypes(include=[np.number]).columns
-    for col in numeric_cols:
-        analysis['summary'][col] = {
-            'mean': float(df[col].mean()),
-            'min': float(df[col].min()),
-            'max': float(df[col].max())
-        }
-    
-    return analysis
 
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -77,13 +52,6 @@ class handler(BaseHTTPRequestHandler):
                 .upload-btn:hover {
                     background-color: #0056b3;
                 }
-                #result {
-                    margin-top: 20px;
-                    padding: 15px;
-                    border-radius: 4px;
-                    background-color: #e9ecef;
-                    white-space: pre-wrap;
-                }
             </style>
         </head>
         <body>
@@ -101,8 +69,9 @@ class handler(BaseHTTPRequestHandler):
                     </form>
                 </div>
                 
-                <div id="result" style="display: none;">
-                    <!-- Results will be displayed here -->
+                <div id="result" class="card" style="display: none; margin-top: 20px;">
+                    <h2>Analysis Results</h2>
+                    <pre id="resultContent" style="white-space: pre-wrap;"></pre>
                 </div>
             </div>
             
@@ -118,12 +87,12 @@ class handler(BaseHTTPRequestHandler):
                         });
                         const result = await response.json();
                         
-                        const resultDiv = document.getElementById('result');
-                        resultDiv.style.display = 'block';
-                        resultDiv.innerHTML = '<h2>Analysis Results</h2>' + 
-                                           '<pre>' + JSON.stringify(result, null, 2) + '</pre>';
+                        document.getElementById('result').style.display = 'block';
+                        document.getElementById('resultContent').textContent = 
+                            JSON.stringify(result, null, 2);
                     } catch (error) {
                         console.error('Error:', error);
+                        alert('Error processing file: ' + error.message);
                     }
                 };
             </script>
@@ -137,42 +106,45 @@ class handler(BaseHTTPRequestHandler):
         self.wfile.write(html_content.encode('utf-8'))
 
     def do_POST(self):
-        content_type = self.headers.get('Content-Type', '')
         try:
-            if 'multipart/form-data' in content_type:
-                form = cgi.FieldStorage(
-                    fp=self.rfile,
-                    headers=self.headers,
-                    environ={'REQUEST_METHOD': 'POST'}
-                )
-                
-                if 'file' in form:
-                    fileitem = form['file']
-                    if fileitem.filename:
-                        file_content = fileitem.file.read().decode('utf-8')
-                        
-                        # Analyze the data
-                        analysis_result = analyze_stock_data(file_content)
-                        
-                        response = {
-                            'status': 'success',
-                            'filename': fileitem.filename,
-                            'analysis': analysis_result
-                        }
-                    else:
-                        response = {
-                            'status': 'error',
-                            'message': 'No file was uploaded'
-                        }
+            form = cgi.FieldStorage(
+                fp=self.rfile,
+                headers=self.headers,
+                environ={'REQUEST_METHOD': 'POST'}
+            )
+            
+            if 'file' in form:
+                fileitem = form['file']
+                if fileitem.filename:
+                    # Read CSV content
+                    file_content = fileitem.file.read().decode('utf-8')
+                    csv_reader = csv.reader(io.StringIO(file_content))
+                    
+                    # Get headers and first few rows
+                    headers = next(csv_reader)
+                    data_preview = []
+                    for i, row in enumerate(csv_reader):
+                        if i < 5:  # Get first 5 rows
+                            data_preview.append(row)
+                        else:
+                            break
+                    
+                    response = {
+                        'status': 'success',
+                        'filename': fileitem.filename,
+                        'headers': headers,
+                        'preview': data_preview,
+                        'total_columns': len(headers)
+                    }
                 else:
                     response = {
                         'status': 'error',
-                        'message': 'No file field in form'
+                        'message': 'No file was uploaded'
                     }
             else:
                 response = {
                     'status': 'error',
-                    'message': 'Invalid content type'
+                    'message': 'No file field in form'
                 }
         except Exception as e:
             response = {
