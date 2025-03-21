@@ -3,6 +3,49 @@ import json
 import cgi
 import csv
 import io
+from statistics import mean, stdev
+
+def analyze_stock_data(headers, data):
+    # Convert numeric data
+    numeric_data = {}
+    for i, header in enumerate(headers):
+        try:
+            values = [float(row[i]) for row in data]
+            numeric_data[header] = values
+        except (ValueError, TypeError):
+            continue
+    
+    # Calculate statistics
+    analysis = {
+        'basic_info': {
+            'total_rows': len(data),
+            'columns': headers,
+            'date_range': f"From {data[-1][0]} to {data[0][0]}"
+        },
+        'price_analysis': {}
+    }
+    
+    # Analyze price data
+    if 'close' in numeric_data:
+        close_prices = numeric_data['close']
+        analysis['price_analysis'] = {
+            'latest_price': close_prices[0],
+            'average_price': round(mean(close_prices), 2),
+            'highest_price': round(max(close_prices), 2),
+            'lowest_price': round(min(close_prices), 2),
+            'price_volatility': round(stdev(close_prices), 2) if len(close_prices) > 1 else 0
+        }
+    
+    # Volume analysis
+    if 'volume' in numeric_data:
+        volumes = numeric_data['volume']
+        analysis['volume_analysis'] = {
+            'average_volume': round(mean(volumes), 0),
+            'highest_volume': max(volumes),
+            'lowest_volume': min(volumes)
+        }
+    
+    return analysis
 
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -52,6 +95,21 @@ class handler(BaseHTTPRequestHandler):
                 .upload-btn:hover {
                     background-color: #0056b3;
                 }
+                .analysis-section {
+                    margin-top: 15px;
+                    padding: 10px;
+                    border-bottom: 1px solid #eee;
+                }
+                .analysis-section h3 {
+                    color: #0056b3;
+                    margin-bottom: 10px;
+                }
+                pre {
+                    background-color: #f8f9fa;
+                    padding: 15px;
+                    border-radius: 4px;
+                    overflow-x: auto;
+                }
             </style>
         </head>
         <body>
@@ -69,13 +127,47 @@ class handler(BaseHTTPRequestHandler):
                     </form>
                 </div>
                 
-                <div id="result" class="card" style="display: none; margin-top: 20px;">
+                <div id="result" class="card" style="display: none;">
                     <h2>Analysis Results</h2>
-                    <pre id="resultContent" style="white-space: pre-wrap;"></pre>
+                    <div id="resultContent"></div>
                 </div>
             </div>
             
             <script>
+                function formatAnalysis(data) {
+                    let html = '';
+                    
+                    if (data.basic_info) {
+                        html += '<div class="analysis-section">';
+                        html += '<h3>Basic Information</h3>';
+                        html += `<p>Total Rows: ${data.basic_info.total_rows}</p>`;
+                        html += `<p>Date Range: ${data.basic_info.date_range}</p>`;
+                        html += '</div>';
+                    }
+                    
+                    if (data.price_analysis) {
+                        html += '<div class="analysis-section">';
+                        html += '<h3>Price Analysis</h3>';
+                        html += `<p>Latest Price: ${data.price_analysis.latest_price}</p>`;
+                        html += `<p>Average Price: ${data.price_analysis.average_price}</p>`;
+                        html += `<p>Highest Price: ${data.price_analysis.highest_price}</p>`;
+                        html += `<p>Lowest Price: ${data.price_analysis.lowest_price}</p>`;
+                        html += `<p>Price Volatility: ${data.price_analysis.price_volatility}</p>`;
+                        html += '</div>';
+                    }
+                    
+                    if (data.volume_analysis) {
+                        html += '<div class="analysis-section">';
+                        html += '<h3>Volume Analysis</h3>';
+                        html += `<p>Average Volume: ${data.volume_analysis.average_volume}</p>`;
+                        html += `<p>Highest Volume: ${data.volume_analysis.highest_volume}</p>`;
+                        html += `<p>Lowest Volume: ${data.volume_analysis.lowest_volume}</p>`;
+                        html += '</div>';
+                    }
+                    
+                    return html;
+                }
+                
                 document.querySelector('form').onsubmit = async (e) => {
                     e.preventDefault();
                     const formData = new FormData(e.target);
@@ -87,9 +179,16 @@ class handler(BaseHTTPRequestHandler):
                         });
                         const result = await response.json();
                         
-                        document.getElementById('result').style.display = 'block';
-                        document.getElementById('resultContent').textContent = 
-                            JSON.stringify(result, null, 2);
+                        const resultDiv = document.getElementById('result');
+                        const resultContent = document.getElementById('resultContent');
+                        
+                        if (result.status === 'success') {
+                            resultContent.innerHTML = formatAnalysis(result.analysis);
+                        } else {
+                            resultContent.innerHTML = `<p class="error">Error: ${result.message}</p>`;
+                        }
+                        
+                        resultDiv.style.display = 'block';
                     } catch (error) {
                         console.error('Error:', error);
                         alert('Error processing file: ' + error.message);
@@ -116,25 +215,18 @@ class handler(BaseHTTPRequestHandler):
             if 'file' in form:
                 fileitem = form['file']
                 if fileitem.filename:
-                    # Read CSV content
                     file_content = fileitem.file.read().decode('utf-8')
                     csv_reader = csv.reader(io.StringIO(file_content))
                     
-                    # Get headers and first few rows
                     headers = next(csv_reader)
-                    data_preview = []
-                    for i, row in enumerate(csv_reader):
-                        if i < 5:  # Get first 5 rows
-                            data_preview.append(row)
-                        else:
-                            break
+                    data = list(csv_reader)
+                    
+                    analysis_result = analyze_stock_data(headers, data)
                     
                     response = {
                         'status': 'success',
                         'filename': fileitem.filename,
-                        'headers': headers,
-                        'preview': data_preview,
-                        'total_columns': len(headers)
+                        'analysis': analysis_result
                     }
                 else:
                     response = {
