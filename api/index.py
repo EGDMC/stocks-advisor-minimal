@@ -6,6 +6,7 @@ import io
 from statistics import mean, stdev
 from .smc_analyzer import analyze_smc
 from .technical_indicators import analyze_technicals
+from .charts import get_chart_config
 from .template import HTML_TEMPLATE
 
 def moving_average(data, window):
@@ -40,11 +41,7 @@ def analyze_stock_data(headers, data):
         'prices': [round(price, 2) for price in close_prices],
         'ma20': ma20,
         'ma50': ma50,
-        'indicators': {
-            'rsi': technical_analysis['rsi'],
-            'macd': technical_analysis['macd'],
-            'bollinger': technical_analysis['bollinger']
-        }
+        'indicators': technical_analysis
     }
     
     analysis = {
@@ -88,6 +85,9 @@ def analyze_stock_data(headers, data):
                 } for level in smc_results['liquidity_levels']
             ]
         }
+    
+    # Get chart configurations
+    analysis['chart_configs'] = get_chart_config(chart_data)
     
     if close_prices:
         latest_price = close_prices[0]
