@@ -5,6 +5,7 @@ import csv
 import io
 from statistics import mean, stdev
 from .smc_analyzer import analyze_smc
+from .technical_indicators import analyze_technicals
 from .template import HTML_TEMPLATE
 
 def moving_average(data, window):
@@ -31,11 +32,19 @@ def analyze_stock_data(headers, data):
     ma20 = moving_average(close_prices, 20) if len(close_prices) >= 20 else []
     ma50 = moving_average(close_prices, 50) if len(close_prices) >= 50 else []
     
+    # Calculate technical indicators
+    technical_analysis = analyze_technicals(close_prices)
+    
     chart_data = {
         'labels': dates,
         'prices': [round(price, 2) for price in close_prices],
         'ma20': ma20,
-        'ma50': ma50
+        'ma50': ma50,
+        'indicators': {
+            'rsi': technical_analysis['rsi'],
+            'macd': technical_analysis['macd'],
+            'bollinger': technical_analysis['bollinger']
+        }
     }
     
     analysis = {
@@ -43,7 +52,8 @@ def analyze_stock_data(headers, data):
             'total_rows': len(data),
             'date_range': f"From {dates[-1]} to {dates[0]}"
         },
-        'chart_data': chart_data
+        'chart_data': chart_data,
+        'technical_signals': technical_analysis['signals']
     }
     
     # Add SMC analysis
