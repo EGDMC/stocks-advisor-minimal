@@ -1,10 +1,10 @@
-from flask import Flask
+from flask import Flask, Response
 
 app = Flask(__name__)
 
-@app.route('/')
-def home():
-    return """
+@app.route('/', methods=['GET'])
+def handler():
+    html_content = """
     <html>
         <head>
             <title>Stock Advisor</title>
@@ -18,9 +18,4 @@ def home():
         </body>
     </html>
     """
-
-# For Vercel serverless function
-def handler(request):
-    with app.test_client() as test_client:
-        response = test_client.get('/')
-        return response.get_data(as_text=True)
+    return Response(html_content, mimetype='text/html')
