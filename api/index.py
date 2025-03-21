@@ -4,36 +4,15 @@ import cgi
 import csv
 import io
 from statistics import mean, stdev
+from .smc_analyzer import analyze_smc
+from .template import HTML_TEMPLATE
 
-# Previous helper functions remain the same
 def moving_average(data, window):
     result = []
     for i in range(len(data) - window + 1):
         window_average = sum(data[i:i+window]) / window
         result.append(round(window_average, 2))
     return result
-
-def find_support_resistance(prices, n_points=5):
-    supports = []
-    resistances = []
-    
-    for i in range(n_points, len(prices) - n_points):
-        current_price = prices[i]
-        left_prices = prices[i-n_points:i]
-        right_prices = prices[i+1:i+n_points+1]
-        
-        if all(current_price <= p for p in left_prices) and all(current_price <= p for p in right_prices):
-            supports.append(current_price)
-        elif all(current_price >= p for p in left_prices) and all(current_price >= p for p in right_prices):
-            resistances.append(current_price)
-    
-    supports = sorted(supports)[:3]
-    resistances = sorted(resistances, reverse=True)[:3]
-    
-    return {
-        'support_levels': [round(price, 2) for price in supports],
-        'resistance_levels': [round(price, 2) for price in resistances]
-    }
 
 def analyze_stock_data(headers, data):
     numeric_data = {}
@@ -47,11 +26,7 @@ def analyze_stock_data(headers, data):
                 dates = [row[i] for row in data]
     
     close_prices = numeric_data.get('close', [])
-    
-    levels = find_support_resistance(close_prices) if len(close_prices) > 10 else {
-        'support_levels': [],
-        'resistance_levels': []
-    }
+    volumes = numeric_data.get('volume', [])
     
     ma20 = moving_average(close_prices, 20) if len(close_prices) >= 20 else []
     ma50 = moving_average(close_prices, 50) if len(close_prices) >= 50 else []
@@ -68,9 +43,41 @@ def analyze_stock_data(headers, data):
             'total_rows': len(data),
             'date_range': f"From {dates[-1]} to {dates[0]}"
         },
-        'chart_data': chart_data,
-        'technical_levels': levels
+        'chart_data': chart_data
     }
+    
+    # Add SMC analysis
+    if close_prices and volumes:
+        smc_results = analyze_smc(close_prices, volumes)
+        analysis['smc_analysis'] = smc_results
+        
+        # Add SMC markers to chart
+        analysis['chart_data']['smc_markers'] = {
+            'imbalances': [
+                {
+                    'index': imb['index'],
+                    'price': imb['price'],
+                    'type': imb['type'],
+                    'strength': imb['strength']
+                } for imb in smc_results['imbalances']
+            ],
+            'fvgs': [
+                {
+                    'index': fvg['index'],
+                    'price': fvg['price'],
+                    'type': fvg['type'],
+                    'gap_size': fvg['gap_size']
+                } for fvg in smc_results['fvgs']
+            ],
+            'liquidity_levels': [
+                {
+                    'index': level['index'],
+                    'price': level['price'],
+                    'type': level['type'],
+                    'strength': level['strength']
+                } for level in smc_results['liquidity_levels']
+            ]
+        }
     
     if close_prices:
         latest_price = close_prices[0]
@@ -87,8 +94,7 @@ def analyze_stock_data(headers, data):
             'total_change_percentage': round(price_change_pct, 2)
         }
     
-    if 'volume' in numeric_data:
-        volumes = numeric_data['volume']
+    if volumes:
         avg_volume = mean(volumes)
         analysis['volume_analysis'] = {
             'average_volume': int(avg_volume),
@@ -96,333 +102,6 @@ def analyze_stock_data(headers, data):
         }
     
     return analysis
-
-# HTML template as a string constant
-HTML_TEMPLATE = """<!DOCTYPE html>
-<html>
-<head>
-    <title>Stock Market Analysis</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation"></script>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            line-height: 1.6;
-            margin: 0;
-            padding: 20px;
-            background-color: #f8f9fa;
-        }
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        .card {
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            padding: 20px;
-            margin-top: 20px;
-        }
-        .chart-container {
-            position: relative;
-            height: 400px;
-            width: 100%;
-        }
-        h1, h2, h3 {
-            color: #2c3e50;
-            margin-bottom: 20px;
-        }
-        h1 {
-            text-align: center;
-        }
-        .metrics-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 20px;
-            margin-top: 20px;
-        }
-        .metric-card {
-            background: #fff;
-            padding: 15px;
-            border-radius: 8px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }
-        .metric-value {
-            font-size: 1.5em;
-            font-weight: bold;
-            color: #2c3e50;
-        }
-        .metric-label {
-            color: #7f8c8d;
-            font-size: 0.9em;
-        }
-        .positive { color: #27ae60; }
-        .negative { color: #c0392b; }
-        .upload-btn {
-            background-color: #3498db;
-            color: white;
-            padding: 12px 24px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 1em;
-            transition: background-color 0.3s;
-        }
-        .upload-btn:hover {
-            background-color: #2980b9;
-        }
-        .technical-levels {
-            margin-top: 20px;
-            padding: 15px;
-            background: #f8f9fa;
-            border-radius: 8px;
-        }
-        .level-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 5px 0;
-        }
-        .resistance { color: #e74c3c; }
-        .support { color: #2ecc71; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>Stock Market Analysis</h1>
-        
-        <div class="card">
-            <h2>Data Upload</h2>
-            <form action="/api" method="post" enctype="multipart/form-data">
-                <div class="form-group">
-                    <label>Upload your stock data (CSV):</label><br>
-                    <input type="file" name="file" accept=".csv" style="margin: 10px 0;" required>
-                </div>
-                <button type="submit" class="upload-btn">Upload and Analyze</button>
-            </form>
-        </div>
-        
-        <div id="result" style="display: none;">
-            <div class="card">
-                <h2>Price Chart</h2>
-                <div class="chart-container">
-                    <canvas id="priceChart"></canvas>
-                </div>
-            </div>
-            
-            <div class="card">
-                <h2>Technical Levels</h2>
-                <div id="technicalLevels" class="technical-levels"></div>
-            </div>
-            
-            <div class="card">
-                <h2>Analysis Results</h2>
-                <div id="resultContent"></div>
-            </div>
-        </div>
-    </div>
-    
-    <script>
-        let priceChart = null;
-        
-        function formatNumber(num) {
-            return new Intl.NumberFormat().format(num);
-        }
-        
-        function createChart(data, levels) {
-            const ctx = document.getElementById('priceChart').getContext('2d');
-            
-            if (priceChart) {
-                priceChart.destroy();
-            }
-            
-            const annotations = {};
-            
-            levels.support_levels.forEach((level, index) => {
-                annotations[`support${index}`] = {
-                    type: 'line',
-                    yMin: level,
-                    yMax: level,
-                    borderColor: '#2ecc71',
-                    borderWidth: 1,
-                    borderDash: [5, 5],
-                    label: {
-                        content: `Support: $${level}`,
-                        enabled: true,
-                        position: 'left'
-                    }
-                };
-            });
-            
-            levels.resistance_levels.forEach((level, index) => {
-                annotations[`resistance${index}`] = {
-                    type: 'line',
-                    yMin: level,
-                    yMax: level,
-                    borderColor: '#e74c3c',
-                    borderWidth: 1,
-                    borderDash: [5, 5],
-                    label: {
-                        content: `Resistance: $${level}`,
-                        enabled: true,
-                        position: 'left'
-                    }
-                };
-            });
-            
-            priceChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: data.labels.reverse(),
-                    datasets: [
-                        {
-                            label: 'Price',
-                            data: data.prices.reverse(),
-                            borderColor: '#2c3e50',
-                            tension: 0.1
-                        },
-                        {
-                            label: '20-day MA',
-                            data: Array(data.labels.length - data.ma20.length)
-                                .fill(null)
-                                .concat(data.ma20.reverse()),
-                            borderColor: '#e74c3c',
-                            borderWidth: 1,
-                            pointRadius: 0
-                        },
-                        {
-                            label: '50-day MA',
-                            data: Array(data.labels.length - data.ma50.length)
-                                .fill(null)
-                                .concat(data.ma50.reverse()),
-                            borderColor: '#3498db',
-                            borderWidth: 1,
-                            pointRadius: 0
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'top'
-                        },
-                        annotation: {
-                            annotations: annotations
-                        }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: false
-                        }
-                    }
-                }
-            });
-        }
-        
-        function formatTechnicalLevels(levels) {
-            let html = '';
-            
-            if (levels.resistance_levels.length > 0) {
-                html += '<h3>Resistance Levels</h3>';
-                levels.resistance_levels.forEach(level => {
-                    html += `<div class="level-item">
-                        <span>Resistance</span>
-                        <span class="resistance">$${level}</span>
-                    </div>`;
-                });
-            }
-            
-            if (levels.support_levels.length > 0) {
-                html += '<h3>Support Levels</h3>';
-                levels.support_levels.forEach(level => {
-                    html += `<div class="level-item">
-                        <span>Support</span>
-                        <span class="support">$${level}</span>
-                    </div>`;
-                });
-            }
-            
-            return html;
-        }
-        
-        function formatMetrics(analysis) {
-            let html = '<div class="metrics-grid">';
-            
-            if (analysis.price_analysis) {
-                const pa = analysis.price_analysis;
-                const changeClass = pa.total_change >= 0 ? 'positive' : 'negative';
-                const changeSymbol = pa.total_change >= 0 ? '+' : '';
-                
-                html += `
-                    <div class="metric-card">
-                        <div class="metric-value">$${pa.latest_price}</div>
-                        <div class="metric-label">Latest Price</div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-value ${changeClass}">
-                            ${changeSymbol}${pa.total_change_percentage}%
-                        </div>
-                        <div class="metric-label">Total Change</div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-value">$${pa.average_price}</div>
-                        <div class="metric-label">Average Price</div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-value">${pa.volatility}</div>
-                        <div class="metric-label">Volatility</div>
-                    </div>
-                `;
-            }
-            
-            if (analysis.volume_analysis) {
-                const va = analysis.volume_analysis;
-                html += `
-                    <div class="metric-card">
-                        <div class="metric-value">${formatNumber(va.latest_volume)}</div>
-                        <div class="metric-label">Latest Volume</div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-value">${formatNumber(va.average_volume)}</div>
-                        <div class="metric-label">Average Volume</div>
-                    </div>
-                `;
-            }
-            
-            html += '</div>';
-            return html;
-        }
-        
-        document.querySelector('form').onsubmit = async (e) => {
-            e.preventDefault();
-            const formData = new FormData(e.target);
-            
-            try {
-                const response = await fetch('/api', {
-                    method: 'POST',
-                    body: formData
-                });
-                const result = await response.json();
-                
-                if (result.status === 'success') {
-                    document.getElementById('result').style.display = 'block';
-                    document.getElementById('resultContent').innerHTML = formatMetrics(result.analysis);
-                    document.getElementById('technicalLevels').innerHTML = 
-                        formatTechnicalLevels(result.analysis.technical_levels);
-                    createChart(result.analysis.chart_data, result.analysis.technical_levels);
-                } else {
-                    alert('Error: ' + result.message);
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                alert('Error processing file: ' + error.message);
-            }
-        };
-    </script>
-</body>
-</html>"""
 
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
