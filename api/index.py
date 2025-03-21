@@ -1,4 +1,7 @@
 from http.server import BaseHTTPRequestHandler
+import json
+import cgi
+import io
 
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -54,11 +57,13 @@ class handler(BaseHTTPRequestHandler):
                 
                 <div class="card">
                     <h2>Data Upload</h2>
-                    <div class="form-group">
-                        <label>Upload your stock data:</label><br>
-                        <input type="file" id="fileUpload" style="margin: 10px 0;">
-                    </div>
-                    <button class="upload-btn" onclick="alert('Coming soon!')">Upload</button>
+                    <form action="/api" method="post" enctype="multipart/form-data">
+                        <div class="form-group">
+                            <label>Upload your stock data:</label><br>
+                            <input type="file" name="file" accept=".csv" style="margin: 10px 0;" required>
+                        </div>
+                        <button type="submit" class="upload-btn">Upload and Analyze</button>
+                    </form>
                 </div>
             </div>
         </body>
@@ -69,3 +74,48 @@ class handler(BaseHTTPRequestHandler):
         self.send_header('Content-type', 'text/html')
         self.end_headers()
         self.wfile.write(html_content.encode('utf-8'))
+
+    def do_POST(self):
+        # Parse the form data
+        content_type = self.headers.get('Content-Type', '')
+        if 'multipart/form-data' in content_type:
+            form = cgi.FieldStorage(
+                fp=self.rfile,
+                headers=self.headers,
+                environ={'REQUEST_METHOD': 'POST'}
+            )
+            
+            # Get the uploaded file
+            if 'file' in form:
+                fileitem = form['file']
+                if fileitem.filename:
+                    # Read the file content
+                    file_content = fileitem.file.read().decode('utf-8')
+                    
+                    # Here you would process the file content
+                    response = {
+                        'status': 'success',
+                        'message': f'File {fileitem.filename} received',
+                        'size': len(file_content)
+                    }
+                else:
+                    response = {
+                        'status': 'error',
+                        'message': 'No file was uploaded'
+                    }
+            else:
+                response = {
+                    'status': 'error',
+                    'message': 'No file field in form'
+                }
+        else:
+            response = {
+                'status': 'error',
+                'message': 'Invalid content type'
+            }
+
+        # Send response
+        self.send_response(200)
+        self.send_header('Content-type', 'application/json')
+        self.end_headers()
+        self.wfile.write(json.dumps(response).encode('utf-8'))
