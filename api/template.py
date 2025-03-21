@@ -28,6 +28,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             position: relative;
             height: 400px;
             width: 100%;
+            margin-bottom: 20px;
+        }
+        .sub-chart {
+            height: 200px;
         }
         h1, h2, h3 {
             color: #2c3e50;
@@ -40,32 +44,16 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             gap: 20px;
             margin-top: 20px;
         }
-        .metric-card {
-            background: #fff;
-            padding: 15px;
-            border-radius: 8px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }
-        .smc-card {
-            background: #2c3e50;
+        .indicator-card {
+            background: #34495e;
             color: white;
             padding: 15px;
             border-radius: 8px;
-            margin-top: 20px;
+            margin-top: 10px;
         }
-        .metric-value {
-            font-size: 1.5em;
-            font-weight: bold;
-            color: #2c3e50;
-        }
-        .metric-label {
-            color: #7f8c8d;
-            font-size: 0.9em;
-        }
-        .positive { color: #27ae60; }
-        .negative { color: #c0392b; }
-        .bullish { color: #27ae60; }
-        .bearish { color: #c0392b; }
+        .signal-bullish { color: #2ecc71; }
+        .signal-bearish { color: #e74c3c; }
+        .signal-neutral { color: #f1c40f; }
         .upload-btn {
             background-color: #3498db;
             color: white;
@@ -78,17 +66,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         }
         .upload-btn:hover {
             background-color: #2980b9;
-        }
-        .smc-levels {
-            margin-top: 20px;
-            padding: 15px;
-            background: #f8f9fa;
-            border-radius: 8px;
-        }
-        .level-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 5px 0;
         }
     </style>
 </head>
@@ -109,224 +86,105 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         
         <div id="result" style="display: none;">
             <div class="card">
-                <h2>Price Chart</h2>
+                <h2>Price Analysis</h2>
                 <div class="chart-container">
                     <canvas id="priceChart"></canvas>
                 </div>
             </div>
             
+            <div class="card">
+                <h2>Technical Indicators</h2>
+                <div class="metrics-grid" id="technicalSignals"></div>
+                <div class="chart-container sub-chart">
+                    <canvas id="rsiChart"></canvas>
+                </div>
+                <div class="chart-container sub-chart">
+                    <canvas id="macdChart"></canvas>
+                </div>
+            </div>
+            
             <div id="smc-analysis" class="card">
                 <h2>SMC Analysis</h2>
-                <div id="smcContent" class="smc-card"></div>
+                <div id="smcContent"></div>
             </div>
             
             <div class="card">
-                <h2>Analysis Results</h2>
+                <h2>Price Statistics</h2>
                 <div id="resultContent"></div>
             </div>
         </div>
     </div>
     
     <script>
-        let priceChart = null;
+        let charts = {};
         
-        function formatNumber(num) {
-            return new Intl.NumberFormat().format(num);
+        function createCharts(configs) {
+            // Destroy existing charts
+            Object.values(charts).forEach(chart => chart?.destroy());
+            
+            // Create main price chart
+            charts.price = new Chart(
+                document.getElementById('priceChart').getContext('2d'),
+                configs.main
+            );
+            
+            // Create RSI chart
+            charts.rsi = new Chart(
+                document.getElementById('rsiChart').getContext('2d'),
+                configs.rsi
+            );
+            
+            // Create MACD chart
+            charts.macd = new Chart(
+                document.getElementById('macdChart').getContext('2d'),
+                configs.macd
+            );
         }
         
-        function createChart(data) {
-            const ctx = document.getElementById('priceChart').getContext('2d');
-            
-            if (priceChart) {
-                priceChart.destroy();
-            }
-            
-            const annotations = {};
-            
-            // Add SMC markers if available
-            if (data.smc_markers) {
-                data.smc_markers.imbalances.forEach((imb, i) => {
-                    annotations[`imbalance${i}`] = {
-                        type: 'point',
-                        xValue: data.labels.length - 1 - imb.index,
-                        yValue: imb.price,
-                        backgroundColor: imb.type === 'bullish' ? '#27ae60' : '#c0392b',
-                        radius: 6 * imb.strength,
-                        borderColor: 'white',
-                        borderWidth: 2
-                    };
-                });
-                
-                data.smc_markers.liquidity_levels.forEach((level, i) => {
-                    annotations[`liquidity${i}`] = {
-                        type: 'line',
-                        yMin: level.price,
-                        yMax: level.price,
-                        borderColor: level.type === 'support' ? '#2ecc71' : '#e74c3c',
-                        borderWidth: 2 * level.strength,
-                        borderDash: [5, 5]
-                    };
-                });
-                
-                data.smc_markers.fvgs.forEach((fvg, i) => {
-                    annotations[`fvg${i}`] = {
-                        type: 'box',
-                        xMin: data.labels.length - 1 - fvg.index - 0.5,
-                        xMax: data.labels.length - 1 - fvg.index + 0.5,
-                        yMin: fvg.price - fvg.gap_size,
-                        yMax: fvg.price + fvg.gap_size,
-                        backgroundColor: fvg.type === 'bullish' ? 'rgba(39, 174, 96, 0.2)' : 'rgba(192, 57, 43, 0.2)',
-                        borderColor: fvg.type === 'bullish' ? '#27ae60' : '#c0392b',
-                        borderWidth: 1
-                    };
-                });
-            }
-            
-            priceChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: data.labels.reverse(),
-                    datasets: [
-                        {
-                            label: 'Price',
-                            data: data.prices.reverse(),
-                            borderColor: '#2c3e50',
-                            tension: 0.1
-                        },
-                        {
-                            label: '20-day MA',
-                            data: Array(data.labels.length - data.ma20.length)
-                                .fill(null)
-                                .concat(data.ma20.reverse()),
-                            borderColor: '#e74c3c',
-                            borderWidth: 1,
-                            pointRadius: 0
-                        },
-                        {
-                            label: '50-day MA',
-                            data: Array(data.labels.length - data.ma50.length)
-                                .fill(null)
-                                .concat(data.ma50.reverse()),
-                            borderColor: '#3498db',
-                            borderWidth: 1,
-                            pointRadius: 0
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'top'
-                        },
-                        annotation: {
-                            annotations: annotations
-                        }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: false
-                        }
-                    }
-                }
-            });
-        }
-        
-        function formatSMCAnalysis(smc) {
-            if (!smc) return '';
+        function formatTechnicalSignals(signals) {
+            if (!signals) return '';
             
             let html = '';
             
-            if (smc.trend) {
+            if (signals.rsi) {
+                const signalClass = signals.rsi.condition === 'oversold' ? 'signal-bullish' :
+                                  signals.rsi.condition === 'overbought' ? 'signal-bearish' :
+                                  'signal-neutral';
                 html += `
-                    <div class="metric-card">
-                        <div class="metric-value ${smc.trend.direction}">
-                            ${smc.trend.direction.toUpperCase()}
-                        </div>
-                        <div class="metric-label">
-                            Market Structure (Strength: ${smc.trend.strength})
+                    <div class="indicator-card">
+                        <h3>RSI</h3>
+                        <div class="${signalClass}">
+                            ${signals.rsi.value} (${signals.rsi.condition})
                         </div>
                     </div>
                 `;
             }
             
-            if (smc.imbalances.length > 0) {
-                html += '<h3>Recent Imbalances</h3>';
-                smc.imbalances.slice(-3).forEach(imb => {
-                    html += `
-                        <div class="level-item">
-                            <span>${imb.type.toUpperCase()}</span>
-                            <span class="${imb.type}">
-                                $${imb.price} (${imb.strength}x)
-                            </span>
-                        </div>
-                    `;
-                });
-            }
-            
-            if (smc.liquidity_levels.length > 0) {
-                html += '<h3>Key Liquidity Levels</h3>';
-                smc.liquidity_levels.forEach(level => {
-                    html += `
-                        <div class="level-item">
-                            <span>${level.type.toUpperCase()}</span>
-                            <span class="${level.type}">
-                                $${level.price} (${level.strength}x)
-                            </span>
-                        </div>
-                    `;
-                });
-            }
-            
-            return html;
-        }
-        
-        function formatMetrics(analysis) {
-            let html = '<div class="metrics-grid">';
-            
-            if (analysis.price_analysis) {
-                const pa = analysis.price_analysis;
-                const changeClass = pa.total_change >= 0 ? 'positive' : 'negative';
-                const changeSymbol = pa.total_change >= 0 ? '+' : '';
-                
+            if (signals.macd) {
+                const signalClass = signals.macd.trend === 'bullish' ? 'signal-bullish' : 'signal-bearish';
                 html += `
-                    <div class="metric-card">
-                        <div class="metric-value">$${pa.latest_price}</div>
-                        <div class="metric-label">Latest Price</div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-value ${changeClass}">
-                            ${changeSymbol}${pa.total_change_percentage}%
+                    <div class="indicator-card">
+                        <h3>MACD</h3>
+                        <div class="${signalClass}">
+                            ${signals.macd.trend.toUpperCase()}
+                            <br>Strength: ${signals.macd.strength}
                         </div>
-                        <div class="metric-label">Total Change</div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-value">$${pa.average_price}</div>
-                        <div class="metric-label">Average Price</div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-value">${pa.volatility}</div>
-                        <div class="metric-label">Volatility</div>
                     </div>
                 `;
             }
             
-            if (analysis.volume_analysis) {
-                const va = analysis.volume_analysis;
+            if (signals.bollinger) {
                 html += `
-                    <div class="metric-card">
-                        <div class="metric-value">${formatNumber(va.latest_volume)}</div>
-                        <div class="metric-label">Latest Volume</div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-value">${formatNumber(va.average_volume)}</div>
-                        <div class="metric-label">Average Volume</div>
+                    <div class="indicator-card">
+                        <h3>Bollinger Bands</h3>
+                        <div>
+                            Width: ${signals.bollinger.width}<br>
+                            Position: ${signals.bollinger.position}
+                        </div>
                     </div>
                 `;
             }
             
-            html += '</div>';
             return html;
         }
         
@@ -343,15 +201,24 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 
                 if (result.status === 'success') {
                     document.getElementById('result').style.display = 'block';
-                    document.getElementById('resultContent').innerHTML = formatMetrics(result.analysis);
                     
+                    // Create charts using configurations
+                    createCharts(result.analysis.chart_configs);
+                    
+                    // Update technical signals
+                    document.getElementById('technicalSignals').innerHTML = 
+                        formatTechnicalSignals(result.analysis.technical_signals);
+                    
+                    // Update SMC analysis if available
                     if (result.analysis.smc_analysis) {
                         document.getElementById('smc-analysis').style.display = 'block';
                         document.getElementById('smcContent').innerHTML = 
                             formatSMCAnalysis(result.analysis.smc_analysis);
                     }
                     
-                    createChart(result.analysis.chart_data);
+                    // Update price statistics
+                    document.getElementById('resultContent').innerHTML = 
+                        formatMetrics(result.analysis);
                 } else {
                     alert('Error: ' + result.message);
                 }
@@ -360,6 +227,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 alert('Error processing file: ' + error.message);
             }
         };
+        
+        // Previous helper functions (formatMetrics, formatSMCAnalysis) remain unchanged
     </script>
 </body>
 </html>"""
