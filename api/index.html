@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Stock Market Analysis</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation"></script>
+    <style>
+        /* Your existing styles */
+    </style>
+</head>
+<body>
+    <!-- Your existing HTML -->
+    
+    <script>
+        function createChart(data, levels) {
+            const ctx = document.getElementById('priceChart').getContext('2d');
+            
+            if (priceChart) {
+                priceChart.destroy();
+            }
+            
+            const annotations = {};
+            
+            levels.support_levels.forEach((level, index) => {
+                annotations[`support${index}`] = {
+                    type: 'line',
+                    yMin: level,
+                    yMax: level,
+                    borderColor: '#2ecc71',
+                    borderWidth: 1,
+                    borderDash: [5, 5],
+                    label: {
+                        content: `Support: $${level}`,
+                        enabled: true,
+                        position: 'left'
+                    }
+                };
+            });
+            
+            levels.resistance_levels.forEach((level, index) => {
+                annotations[`resistance${index}`] = {
+                    type: 'line',
+                    yMin: level,
+                    yMax: level,
+                    borderColor: '#e74c3c',
+                    borderWidth: 1,
+                    borderDash: [5, 5],
+                    label: {
+                        content: `Resistance: $${level}`,
+                        enabled: true,
+                        position: 'left'
+                    }
+                };
+            });
+            
+            priceChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.labels.reverse(),
+                    datasets: [
+                        {
+                            label: 'Price',
+                            data: data.prices.reverse(),
+                            borderColor: '#2c3e50',
+                            tension: 0.1
+                        },
+                        {
+                            label: '20-day MA',
+                            data: Array(data.labels.length - data.ma20.length)
+                                .fill(null)
+                                .concat(data.ma20.reverse()),
+                            borderColor: '#e74c3c',
+                            borderWidth: 1,
+                            pointRadius: 0
+                        },
+                        {
+                            label: '50-day MA',
+                            data: Array(data.labels.length - data.ma50.length)
+                                .fill(null)
+                                .concat(data.ma50.reverse()),
+                            borderColor: '#3498db',
+                            borderWidth: 1,
+                            pointRadius: 0
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top'
+                        },
+                        annotation: {
+                            annotations: annotations
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: false
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>
