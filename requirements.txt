@@ -1,4 +1,1 @@
-dash==2.14.2
-dash-bootstrap-components==1.5.0
 flask==2.0.1
-gunicorn==21.2.0
