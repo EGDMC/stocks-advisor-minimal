@@ -30,6 +30,7 @@ def analyze_stock_data(headers, data):
     close_prices = numeric_data.get('close', [])
     volumes = numeric_data.get('volume', [])
     
+    # Calculate moving averages
     ma20 = moving_average(close_prices, 20) if len(close_prices) >= 20 else []
     ma50 = moving_average(close_prices, 50) if len(close_prices) >= 50 else []
     
@@ -37,10 +38,10 @@ def analyze_stock_data(headers, data):
     technical_analysis = analyze_technicals(close_prices)
     
     chart_data = {
-        'labels': dates,
+        'labels': list(dates),  # Convert to list to ensure it's mutable
         'prices': [round(price, 2) for price in close_prices],
-        'ma20': ma20,
-        'ma50': ma50,
+        'ma20': list(ma20),  # Convert to list to ensure it's mutable
+        'ma50': list(ma50),  # Convert to list to ensure it's mutable
         'indicators': technical_analysis
     }
     
@@ -50,7 +51,7 @@ def analyze_stock_data(headers, data):
             'date_range': f"From {dates[-1]} to {dates[0]}"
         },
         'chart_data': chart_data,
-        'technical_signals': technical_analysis['signals']
+        'technical_signals': technical_analysis.get('signals', {})
     }
     
     # Add SMC analysis
