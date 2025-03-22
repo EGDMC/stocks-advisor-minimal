@@ -8,80 +8,60 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
-    
-    <!-- Add the full CSS from the previous version -->
-    
     <style>
         /* Previous styles remain the same */
     </style>
 </head>
 <body>
-    <!-- Sidebar Navigation -->
-    <nav class="sidebar">
-        <div class="sidebar-brand">
-            <i class="ri-line-chart-line"></i>
-            Trading Analysis
-        </div>
-        <a href="#" class="nav-item active" data-page="upload">
-            <i class="ri-upload-cloud-line"></i>
-            Upload Data
-        </a>
-        <a href="#" class="nav-item" data-page="price">
-            <i class="ri-stock-line"></i>
-            Price Analysis
-        </a>
-        <a href="#" class="nav-item" data-page="trend">
-            <i class="ri-funds-line"></i>
-            Trend Analysis
-        </a>
-        <a href="#" class="nav-item" data-page="patterns">
-            <i class="ri-rhythm-line"></i>
-            Pattern Recognition
-        </a>
-        <a href="#" class="nav-item" data-page="technical">
-            <i class="ri-bar-chart-box-line"></i>
-            Technical Indicators
-        </a>
-        <a href="#" class="nav-item" data-page="smc">
-            <i class="ri-radar-line"></i>
-            SMC Analysis
-        </a>
-    </nav>
+    <!-- Previous HTML structure remains the same -->
 
-    <!-- Main Content -->
-    <main class="main-content">
-        <!-- Upload Page -->
-        <div id="upload-page" class="page active">
-            <!-- Previous upload content remains the same -->
-        </div>
-
-        <!-- Pages content from previous version -->
-    </main>
-
-    <!-- Loading Spinner -->
-    <div class="loading">
-        <div class="spinner"></div>
-    </div>
-
-    <!-- JavaScript -->
     <script>
-        // Previous JavaScript functions remain the same
+        // Chart management
+        let charts = {};
+
+        // Utility functions
+        function formatNumber(num) {
+            return new Intl.NumberFormat().format(num);
+        }
+
+        function createCharts(configs) {
+            // Destroy existing charts
+            Object.values(charts).forEach(chart => chart?.destroy());
+            
+            // Create main price chart
+            if (configs.main) {
+                const ctx = document.getElementById('priceChart').getContext('2d');
+                charts.price = new Chart(ctx, configs.main);
+            }
+            
+            // Create RSI chart
+            if (configs.rsi) {
+                const ctx = document.getElementById('rsiChart').getContext('2d');
+                charts.rsi = new Chart(ctx, configs.rsi);
+            }
+            
+            // Create MACD chart
+            if (configs.macd) {
+                const ctx = document.getElementById('macdChart').getContext('2d');
+                charts.macd = new Chart(ctx, configs.macd);
+            }
+        }
+
+        // Analysis update functions remain the same
         
-        // Initialize everything when the DOM is ready
+        // Initialize when DOM is ready
         document.addEventListener('DOMContentLoaded', () => {
-            // Add navigation event listeners
+            // Navigation
             document.querySelectorAll('.nav-item').forEach(item => {
                 item.addEventListener('click', e => {
                     e.preventDefault();
                     const pageId = item.getAttribute('data-page');
                     
-                    // Update navigation
                     document.querySelectorAll('.nav-item').forEach(nav => 
                         nav.classList.remove('active')
                     );
                     item.classList.add('active');
                     
-                    // Update pages
                     document.querySelectorAll('.page').forEach(page => 
                         page.classList.remove('active')
                     );
@@ -89,13 +69,17 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 });
             });
 
-            // Initialize file upload handling
+            // File upload
             const dropZone = document.getElementById('dropZone');
             const fileInput = document.getElementById('fileInput');
             const selectedFileText = document.getElementById('selectedFile');
+            const uploadBtn = document.querySelector('.upload-btn');
             const loading = document.querySelector('.loading');
 
-            // Prevent default drag behaviors
+            // Add click handler for the upload button
+            uploadBtn.addEventListener('click', () => fileInput.click());
+
+            // Prevent defaults for drag and drop
             ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
                 dropZone.addEventListener(eventName, preventDefaults, false);
                 document.body.addEventListener(eventName, preventDefaults, false);
@@ -106,19 +90,18 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 e.stopPropagation();
             }
 
-            // Handle file drag & drop
-            dropZone.addEventListener('dragenter', highlight);
-            dropZone.addEventListener('dragover', highlight);
-            dropZone.addEventListener('dragleave', unhighlight);
-            dropZone.addEventListener('drop', unhighlight);
+            // Add drag and drop handlers
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropZone.addEventListener(eventName, () => 
+                    dropZone.classList.add('highlight')
+                );
+            });
 
-            function highlight() {
-                dropZone.classList.add('highlight');
-            }
-
-            function unhighlight() {
-                dropZone.classList.remove('highlight');
-            }
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, () => 
+                    dropZone.classList.remove('highlight')
+                );
+            });
 
             // Handle file selection
             fileInput.addEventListener('change', e => {
@@ -126,12 +109,16 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 if (file) handleUpload(file);
             });
 
+            // Handle file drop
             dropZone.addEventListener('drop', e => {
                 const file = e.dataTransfer.files[0];
                 if (file) handleUpload(file);
             });
 
+            // File upload handler
             async function handleUpload(file) {
+                if (!file) return;
+                
                 selectedFileText.textContent = file.name;
                 loading.classList.add('active');
 
@@ -144,20 +131,42 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                         body: formData
                     });
 
-                    if (!response.ok) throw new Error('Upload failed');
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
 
                     const result = await response.json();
 
                     if (result.status === 'success') {
-                        // Create charts
-                        createCharts(result.analysis.chart_configs);
+                        // Update analysis
+                        if (result.analysis.chart_configs) {
+                            createCharts(result.analysis.chart_configs);
+                        }
                         
-                        // Update all sections
-                        updateTechnicalSignals(result.analysis.technical_signals);
-                        updatePatterns(result.analysis.patterns);
-                        updateTrendAnalysis(result.analysis.trend_analysis);
-                        updateSMCAnalysis(result.analysis.smc_analysis);
-                        updatePriceStats(result.analysis.price_analysis);
+                        if (result.analysis.technical_signals) {
+                            document.getElementById('technicalSignals').innerHTML = 
+                                formatTechnicalSignals(result.analysis.technical_signals);
+                        }
+                        
+                        if (result.analysis.patterns) {
+                            document.getElementById('patterns-content').innerHTML = 
+                                formatPatterns(result.analysis.patterns);
+                        }
+                        
+                        if (result.analysis.trend_analysis) {
+                            document.getElementById('trend-content').innerHTML = 
+                                formatTrendAnalysis(result.analysis.trend_analysis);
+                        }
+                        
+                        if (result.analysis.smc_analysis) {
+                            document.getElementById('smc-content').innerHTML = 
+                                formatSMCAnalysis(result.analysis.smc_analysis);
+                        }
+                        
+                        if (result.analysis.price_analysis) {
+                            document.getElementById('resultContent').innerHTML = 
+                                formatPriceStats(result.analysis.price_analysis);
+                        }
                         
                         // Navigate to price analysis page
                         document.querySelector('[data-page="price"]').click();
@@ -166,7 +175,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     }
                 } catch (error) {
                     console.error('Error:', error);
-                    alert('Error processing file: ' + error.message);
+                    alert('Error uploading file: ' + error.message);
                 } finally {
                     loading.classList.remove('active');
                 }
