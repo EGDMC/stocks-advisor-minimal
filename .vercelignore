@@ -1,0 +1,66 @@
+# Ignore development files
+__pycache__
+*.pyc
+.git
+.gitignore
+*.log
+*.csv
+*.json
+*.joblib
+*.npy
+
+# Ignore test files
+test_*
+*_test.py
+
+# Ignore documentation
+*.md
+docs/
+
+# Ignore development configs
+.env*
+*.config
+
+# Ignore model files (will be loaded from external source)
+models/
+
+# Ignore sample data
+data/
+sample_data/
+
+# Ignore notebooks
+*.ipynb
+.ipynb_checkpoints/
+
+# Ignore cache directories
+.cache/
+.pytest_cache/
+
+# Ignore version control
+.git/
+.gitignore
+
+# Ignore local development files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Ignore system files
+.DS_Store
+Thumbs.db
+
+# Ignore virtual environments
+venv/
+env/
+.env/
+.venv/
+
+# Ignore package files
+*.egg-info/
+dist/
+build/
+
+# Ignore large dependencies that can be installed
+node_modules/
+site-packages/
