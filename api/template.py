@@ -45,6 +45,35 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             height: 100vh;
             left: 0;
             top: 0;
+            z-index: 100;
+        }
+
+        .sidebar-brand {
+            color: white;
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 2rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .nav-item {
+            color: #9ca3af;
+            text-decoration: none;
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 0.5rem;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .nav-item:hover, .nav-item.active {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
         }
 
         .main-content {
@@ -55,10 +84,31 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 
         .page {
             display: none;
+            animation: fadeIn 0.3s ease;
         }
 
         .page.active {
             display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .dashboard-header {
+            margin-bottom: 2rem;
+        }
+
+        .page-title {
+            font-size: 1.875rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .page-description {
+            color: var(--text-secondary);
         }
 
         .card {
@@ -67,6 +117,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
             padding: 1.5rem;
             margin-bottom: 1.5rem;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
 
         .upload-container {
@@ -80,18 +136,115 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             padding: 2rem;
             text-align: center;
             transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .upload-container:hover {
+            border-color: var(--primary-color);
+            background: rgba(37, 99, 235, 0.05);
         }
 
         .upload-container.highlight {
             border-color: var(--primary-color);
-            background-color: rgba(37, 99, 235, 0.1);
+            background: rgba(37, 99, 235, 0.1);
+        }
+
+        .upload-icon {
+            font-size: 3rem;
+            color: var(--primary-color);
+            margin-bottom: 1rem;
         }
 
         .file-input {
             display: none;
         }
 
-        /* Rest of your existing CSS */
+        .upload-btn {
+            background: var(--primary-color);
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 0.5rem;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background 0.3s;
+            margin-top: 1rem;
+        }
+
+        .upload-btn:hover {
+            background: #1d4ed8;
+        }
+
+        .selected-file {
+            margin-top: 1rem;
+            color: var(--text-secondary);
+        }
+
+        .loading {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .loading.active {
+            display: flex;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 400px;
+            width: 100%;
+            margin-bottom: 1.5rem;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+        }
+
+        .indicator-card {
+            background: var(--sidebar-bg);
+            color: white;
+            padding: 1.25rem;
+            border-radius: 0.75rem;
+            transition: transform 0.3s ease;
+        }
+
+        .indicator-card:hover {
+            transform: translateY(-2px);
+        }
+
+        .signal-bullish { color: var(--success-color); font-weight: 600; }
+        .signal-bearish { color: var(--danger-color); font-weight: 600; }
+        .signal-neutral { color: var(--warning-color); font-weight: 600; }
     </style>
 </head>
 <body>
@@ -100,36 +253,33 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             <i class="ri-line-chart-line"></i>
             Trading Analysis
         </div>
-        <nav>
-            <a href="#" class="nav-item active" data-page="upload">
-                <i class="ri-upload-cloud-line"></i>
-                Data Upload
-            </a>
-            <a href="#" class="nav-item" data-page="price">
-                <i class="ri-stock-line"></i>
-                Price Analysis
-            </a>
-            <a href="#" class="nav-item" data-page="trend">
-                <i class="ri-funds-line"></i>
-                Trend Prediction
-            </a>
-            <a href="#" class="nav-item" data-page="patterns">
-                <i class="ri-rhythm-line"></i>
-                Pattern Recognition
-            </a>
-            <a href="#" class="nav-item" data-page="technical">
-                <i class="ri-bar-chart-box-line"></i>
-                Technical Indicators
-            </a>
-            <a href="#" class="nav-item" data-page="smc">
-                <i class="ri-radar-line"></i>
-                SMC Analysis
-            </a>
-        </nav>
+        <a href="#" class="nav-item active" data-page="upload">
+            <i class="ri-upload-cloud-line"></i>
+            Upload Data
+        </a>
+        <a href="#" class="nav-item" data-page="price">
+            <i class="ri-stock-line"></i>
+            Price Analysis
+        </a>
+        <a href="#" class="nav-item" data-page="trend">
+            <i class="ri-funds-line"></i>
+            Trend Analysis
+        </a>
+        <a href="#" class="nav-item" data-page="patterns">
+            <i class="ri-rhythm-line"></i>
+            Pattern Recognition
+        </a>
+        <a href="#" class="nav-item" data-page="technical">
+            <i class="ri-bar-chart-box-line"></i>
+            Technical Indicators
+        </a>
+        <a href="#" class="nav-item" data-page="smc">
+            <i class="ri-radar-line"></i>
+            SMC Analysis
+        </a>
     </nav>
 
     <main class="main-content">
-        <!-- Pages -->
         <div id="upload-page" class="page active">
             <div class="dashboard-header">
                 <h1 class="page-title">Upload Data</h1>
@@ -137,84 +287,142 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             </div>
             
             <div class="card">
-                <form id="uploadForm" enctype="multipart/form-data">
+                <form id="uploadForm">
                     <div class="upload-container" id="dropZone">
                         <i class="ri-upload-cloud-line upload-icon"></i>
-                        <h2>Drop your file here</h2>
+                        <h2>Drop your CSV file here</h2>
                         <p>or</p>
                         <input type="file" name="file" id="fileInput" accept=".csv" class="file-input" required>
-                        <button type="button" class="upload-btn" onclick="document.getElementById('fileInput').click()">
-                            Select File
-                        </button>
+                        <button type="button" class="upload-btn">Select File</button>
                         <p id="selectedFile" class="selected-file"></p>
                     </div>
                 </form>
             </div>
         </div>
 
-        <!-- Other pages -->
         <div id="price-page" class="page">
-            <!-- Price Analysis Content -->
+            <div class="dashboard-header">
+                <h1 class="page-title">Price Analysis</h1>
+                <p class="page-description">Market price movement analysis</p>
+            </div>
+            <div class="card">
+                <div class="chart-container">
+                    <canvas id="priceChart"></canvas>
+                </div>
+            </div>
+            <div class="card">
+                <h2>Price Statistics</h2>
+                <div id="resultContent"></div>
+            </div>
         </div>
 
-        <div id="trend-page" class="page">
-            <!-- Trend Analysis Content -->
-        </div>
-
-        <div id="patterns-page" class="page">
-            <!-- Pattern Recognition Content -->
-        </div>
-
-        <div id="technical-page" class="page">
-            <!-- Technical Analysis Content -->
-        </div>
-
-        <div id="smc-page" class="page">
-            <!-- SMC Analysis Content -->
-        </div>
+        <!-- Other pages... -->
     </main>
 
     <div class="loading">
         <div class="spinner"></div>
     </div>
 
-    <!-- Include chart formatting functions -->
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation"></script>
     <script>
-        // Formatting functions
-        function formatNumber(num) {
-            return new Intl.NumberFormat().format(num);
+        // Navigation
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.addEventListener('click', e => {
+                e.preventDefault();
+                const pageId = item.getAttribute('data-page');
+                
+                document.querySelectorAll('.nav-item').forEach(nav => nav.classList.remove('active'));
+                item.classList.add('active');
+                
+                document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
+                document.getElementById(pageId + '-page').classList.add('active');
+            });
+        });
+
+        // File Upload
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const selectedFileText = document.getElementById('selectedFile');
+        const uploadBtn = document.querySelector('.upload-btn');
+        const loading = document.querySelector('.loading');
+
+        uploadBtn.addEventListener('click', () => fileInput.click());
+
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(event => {
+            dropZone.addEventListener(event, preventDefaults, false);
+            document.body.addEventListener(event, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
         }
 
-        function formatTrendAnalysis(analysis) {
-            // Your existing trend analysis formatting code
+        ['dragenter', 'dragover'].forEach(event => {
+            dropZone.addEventListener(event, () => dropZone.classList.add('highlight'));
+        });
+
+        ['dragleave', 'drop'].forEach(event => {
+            dropZone.addEventListener(event, () => dropZone.classList.remove('highlight'));
+        });
+
+        dropZone.addEventListener('drop', handleDrop);
+        fileInput.addEventListener('change', handleFile);
+
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const file = dt.files[0];
+            handleUpload(file);
         }
 
-        function formatPatterns(patterns) {
-            // Your existing pattern formatting code
+        function handleFile(e) {
+            const file = e.target.files[0];
+            handleUpload(file);
         }
 
-        function formatTechnicalSignals(signals) {
-            // Your existing technical signals formatting code
+        async function handleUpload(file) {
+            if (!file) return;
+            
+            selectedFileText.textContent = file.name;
+            loading.classList.add('active');
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch('/api', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) throw new Error('Upload failed');
+
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    createCharts(result.analysis.chart_configs);
+                    updateAnalysis(result.analysis);
+                    document.querySelector('[data-page="price"]').click();
+                } else {
+                    alert(result.message || 'Upload failed');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error uploading file: ' + error.message);
+            } finally {
+                loading.classList.remove('active');
+            }
         }
 
-        function formatSMCAnalysis(smc) {
-            // Your existing SMC analysis formatting code
+        function updateAnalysis(analysis) {
+            if (analysis.chart_configs) createCharts(analysis.chart_configs);
+            if (analysis.technical_signals) updateTechnicalSignals(analysis.technical_signals);
+            if (analysis.patterns) updatePatterns(analysis.patterns);
+            if (analysis.trend_analysis) updateTrendAnalysis(analysis.trend_analysis);
+            if (analysis.smc_analysis) updateSMCAnalysis(analysis.smc_analysis);
+            if (analysis.price_analysis) updatePriceStats(analysis.price_analysis);
         }
 
-        function formatMetrics(analysis) {
-            // Your existing metrics formatting code
-        }
-
-        function createCharts(configs) {
-            // Your existing chart creation code
-        }
-    </script>
-
-    <!-- Include main functionality -->
-    <script>
-        // Load the static.js content here directly
-        // Copy the content from static.js here
+        // Add other update functions here...
     </script>
 </body>
 </html>"""
