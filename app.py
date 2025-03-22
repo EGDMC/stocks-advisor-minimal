@@ -5,14 +5,23 @@ import pandas as pd
 from api.smc_analyzer import analyze_smc
 import io
 import base64
+import sys
+import subprocess
 
-# Try to import dash_bootstrap_components, use fallback if not available
+# Try to import dash_bootstrap_components with pip install if not found
 try:
     import dash_bootstrap_components as dbc
     has_dbc = True
 except ImportError:
-    has_dbc = False
-    print("Warning: dash_bootstrap_components not found, using basic styling")
+    print("Installing dash_bootstrap_components...")
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "dash_bootstrap_components"])
+    
+    try:
+        import dash_bootstrap_components as dbc
+        has_dbc = True
+    except ImportError:
+        has_dbc = False
+        print("Warning: dash_bootstrap_components installation failed, using basic styling")
 
 def create_app():
     # Use dbc theme if available, otherwise use basic theme
