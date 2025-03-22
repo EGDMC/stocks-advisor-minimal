@@ -1,8 +1,8 @@
 from http.server import BaseHTTPRequestHandler
 import json
-import cgi
 import io
 import csv
+from urllib.parse import parse_header
 from statistics import mean, stdev
 from .technical_indicators import analyze_technicals
 from .pattern_recognition import analyze_patterns
@@ -10,6 +10,46 @@ from .trend_prediction import analyze_trend
 from .smc_analyzer import analyze_smc
 from .charts import get_chart_config
 from .template import HTML_TEMPLATE
+
+def parse_multipart_form(headers, rfile):
+    """Parse multipart form data without using cgi module"""
+    content_type = headers.get('content-type', '')
+    if not content_type:
+        return None
+    
+    boundary = None
+    for item in content_type.split(';'):
+        if 'boundary=' in item:
+            boundary = item.split('=', 1)[1].strip('"')
+            break
+    
+    if not boundary:
+        return None
+    
+    content_length = int(headers.get('content-length', 0))
+    data = rfile.read(content_length)
+    
+    # Split at boundary and process parts
+    parts = data.split(('--' + boundary).encode())
+    
+    for part in parts:
+        # Skip empty parts and boundary end
+        if not part or part.strip() == b'--':
+            continue
+        
+        # Split headers from content
+        try:
+            headers_end = part.index(b'\r\n\r\n')
+            part_headers = part[:headers_end].decode()
+            part_content = part[headers_end + 4:]
+            
+            if 'filename=' in part_headers:
+                # Found the file part
+                return io.StringIO(part_content.decode('utf-8'))
+        except:
+            continue
+    
+    return None
 
 def analyze_stock_data(headers, data):
     numeric_data = {}
@@ -106,35 +146,24 @@ class handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         try:
-            form = cgi.FieldStorage(
-                fp=self.rfile,
-                headers=self.headers,
-                environ={'REQUEST_METHOD': 'POST'}
-            )
+            file_content = parse_multipart_form(self.headers, self.rfile)
             
-            if 'file' in form:
-                fileitem = form['file']
-                if fileitem.filename:
-                    file_content = fileitem.file.read().decode('utf-8')
-                    csv_reader = csv.reader(io.StringIO(file_content))
-                    headers = next(csv_reader)
-                    data = list(csv_reader)
-                    
-                    analysis = analyze_stock_data(headers, data)
-                    response = {
-                        'status': 'success',
-                        'analysis': analysis
-                    }
-                else:
-                    response = {
-                        'status': 'error',
-                        'message': 'No file was uploaded'
-                    }
+            if file_content:
+                csv_reader = csv.reader(file_content)
+                headers = next(csv_reader)
+                data = list(csv_reader)
+                
+                analysis = analyze_stock_data(headers, data)
+                response = {
+                    'status': 'success',
+                    'analysis': analysis
+                }
             else:
                 response = {
                     'status': 'error',
-                    'message': 'No file field in form'
+                    'message': 'No file was uploaded'
                 }
+                
         except Exception as e:
             response = {
                 'status': 'error',
