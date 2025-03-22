@@ -7,6 +7,7 @@ from statistics import mean, stdev
 from .smc_analyzer import analyze_smc
 from .technical_indicators import analyze_technicals
 from .pattern_recognition import analyze_patterns
+from .trend_prediction import analyze_trend
 from .charts import get_chart_config
 from .template import HTML_TEMPLATE
 
@@ -28,10 +29,6 @@ def analyze_stock_data(headers, data):
     lows = numeric_data.get('low', [])
     volumes = numeric_data.get('volume', [])
     
-    # Calculate moving averages
-    ma20 = moving_average(closes, 20) if len(closes) >= 20 else []
-    ma50 = moving_average(closes, 50) if len(closes) >= 50 else []
-    
     # Technical Analysis
     technical_analysis = analyze_technicals(closes)
     
@@ -44,6 +41,32 @@ def analyze_stock_data(headers, data):
             'price_action_patterns': [],
             'chart_patterns': []
         }
+    
+    # SMC Analysis
+    if closes and volumes:
+        smc_results = analyze_smc(closes, volumes)
+        
+        # Get support/resistance levels for trend analysis
+        support_resistance_levels = [
+            {'price': level['price'], 'type': level['type']}
+            for level in smc_results['liquidity_levels']
+        ]
+        
+        # Trend Analysis using patterns and SR levels
+        trend_analysis = analyze_trend(
+            closes, 
+            volumes, 
+            pattern_analysis.get('chart_patterns', []) + 
+            pattern_analysis.get('price_action_patterns', []),
+            support_resistance_levels
+        )
+    else:
+        smc_results = None
+        trend_analysis = None
+    
+    # Moving Averages
+    ma20 = moving_average(closes, 20) if len(closes) >= 20 else []
+    ma50 = moving_average(closes, 50) if len(closes) >= 50 else []
     
     chart_data = {
         'labels': list(dates),
@@ -60,15 +83,13 @@ def analyze_stock_data(headers, data):
         },
         'chart_data': chart_data,
         'technical_signals': technical_analysis.get('signals', {}),
-        'patterns': pattern_analysis
+        'patterns': pattern_analysis,
+        'trend_analysis': trend_analysis
     }
     
-    # Add SMC analysis
-    if closes and volumes:
-        smc_results = analyze_smc(closes, volumes)
+    # Add SMC analysis and markers
+    if smc_results:
         analysis['smc_analysis'] = smc_results
-        
-        # Add SMC markers to chart
         analysis['chart_data']['smc_markers'] = {
             'imbalances': [
                 {
