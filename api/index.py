@@ -6,15 +6,9 @@ import io
 from statistics import mean, stdev
 from .smc_analyzer import analyze_smc
 from .technical_indicators import analyze_technicals
+from .pattern_recognition import analyze_patterns
 from .charts import get_chart_config
 from .template import HTML_TEMPLATE
-
-def moving_average(data, window):
-    result = []
-    for i in range(len(data) - window + 1):
-        window_average = sum(data[i:i+window]) / window
-        result.append(round(window_average, 2))
-    return result
 
 def analyze_stock_data(headers, data):
     numeric_data = {}
@@ -27,21 +21,35 @@ def analyze_stock_data(headers, data):
             if header.lower() == 'date':
                 dates = [row[i] for row in data]
     
-    close_prices = numeric_data.get('close', [])
+    # Extract OHLCV data
+    closes = numeric_data.get('close', [])
+    opens = numeric_data.get('open', [])
+    highs = numeric_data.get('high', [])
+    lows = numeric_data.get('low', [])
     volumes = numeric_data.get('volume', [])
     
     # Calculate moving averages
-    ma20 = moving_average(close_prices, 20) if len(close_prices) >= 20 else []
-    ma50 = moving_average(close_prices, 50) if len(close_prices) >= 50 else []
+    ma20 = moving_average(closes, 20) if len(closes) >= 20 else []
+    ma50 = moving_average(closes, 50) if len(closes) >= 50 else []
     
-    # Calculate technical indicators
-    technical_analysis = analyze_technicals(close_prices)
+    # Technical Analysis
+    technical_analysis = analyze_technicals(closes)
+    
+    # Pattern Recognition
+    if all(x is not None for x in [opens, highs, lows, closes, volumes]):
+        pattern_analysis = analyze_patterns(highs, lows, opens, closes, volumes)
+    else:
+        pattern_analysis = {
+            'candlestick_patterns': [],
+            'price_action_patterns': [],
+            'chart_patterns': []
+        }
     
     chart_data = {
-        'labels': list(dates),  # Convert to list to ensure it's mutable
-        'prices': [round(price, 2) for price in close_prices],
-        'ma20': list(ma20),  # Convert to list to ensure it's mutable
-        'ma50': list(ma50),  # Convert to list to ensure it's mutable
+        'labels': list(dates),
+        'prices': [round(price, 2) for price in closes],
+        'ma20': list(ma20),
+        'ma50': list(ma50),
         'indicators': technical_analysis
     }
     
@@ -51,12 +59,13 @@ def analyze_stock_data(headers, data):
             'date_range': f"From {dates[-1]} to {dates[0]}"
         },
         'chart_data': chart_data,
-        'technical_signals': technical_analysis.get('signals', {})
+        'technical_signals': technical_analysis.get('signals', {}),
+        'patterns': pattern_analysis
     }
     
     # Add SMC analysis
-    if close_prices and volumes:
-        smc_results = analyze_smc(close_prices, volumes)
+    if closes and volumes:
+        smc_results = analyze_smc(closes, volumes)
         analysis['smc_analysis'] = smc_results
         
         # Add SMC markers to chart
@@ -90,17 +99,17 @@ def analyze_stock_data(headers, data):
     # Get chart configurations
     analysis['chart_configs'] = get_chart_config(chart_data)
     
-    if close_prices:
-        latest_price = close_prices[0]
-        price_change = latest_price - close_prices[-1]
-        price_change_pct = (price_change / close_prices[-1]) * 100
+    if closes:
+        latest_price = closes[0]
+        price_change = latest_price - closes[-1]
+        price_change_pct = (price_change / closes[-1]) * 100
         
         analysis['price_analysis'] = {
             'latest_price': round(latest_price, 2),
-            'average_price': round(mean(close_prices), 2),
-            'highest_price': round(max(close_prices), 2),
-            'lowest_price': round(min(close_prices), 2),
-            'volatility': round(stdev(close_prices), 2) if len(close_prices) > 1 else 0,
+            'average_price': round(mean(closes), 2),
+            'highest_price': round(max(closes), 2),
+            'lowest_price': round(min(closes), 2),
+            'volatility': round(stdev(closes), 2) if len(closes) > 1 else 0,
             'total_change': round(price_change, 2),
             'total_change_percentage': round(price_change_pct, 2)
         }
@@ -113,6 +122,13 @@ def analyze_stock_data(headers, data):
         }
     
     return analysis
+
+def moving_average(data, window):
+    result = []
+    for i in range(len(data) - window + 1):
+        window_average = sum(data[i:i+window]) / window
+        result.append(round(window_average, 2))
+    return result
 
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
